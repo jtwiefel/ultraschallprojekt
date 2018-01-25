@@ -13,12 +13,18 @@ from scipy.signal import decimate, convolve
 import copy
 
 #name of file with raw data
-data_filename = "rawdata/felix04.dat"
+#data_filename = "rawdata/felix04.dat"
+data_filename = "rawdata/hannes12.dat"
+#data_filename = "rawdata/probeX.data"
 #data_filename = "rawdata/felix.data"
 
 #pins of the AD082000
 ADC2_GPIO = [7, 8,9,10,11,23,24,25]
 ADC2len = len(ADC2_GPIO)
+
+#ADC2_GPIO = [20,26,16,19,13,12, 7, 8,11]
+#ADC2len = len(ADC2_GPIO)
+
 
 
 def get_signal_details(time, data_size):
@@ -159,6 +165,8 @@ def main():
 #print V[:]
 #
     byte_data = np.fromfile(data_filename, dtype = '<i4')
+    #f = open(data_filename, "r")
+    #byte_data = np.fromfile(f, dtype=np.uint32)    
     print "data points:", len(byte_data)
     
     byte_voltages = byte_data[:-1]
@@ -199,7 +207,7 @@ def main():
     
     #transform the fft back to a time signal
     F = np.real(np.fft.ifft(FFT_voltages))
-    F = rawSig
+    #F = rawSig
     
     #calculate the envelope using hilbert transform
     FH = np.asarray(np.abs(signal.hilbert(F)))
@@ -210,8 +218,10 @@ def main():
 
     #reshape the table in new dimensions.
     #i don't know where the number 1000 comes from...
-    xdim = 10000
-    ydim = (len(byte_data)-1)/xdim
+    #xdim = 2000
+    #ydim = (len(byte_data)-1)/xdim
+    ydim = 2500
+    xdim = (len(byte_data)-1)/ydim
     tableData = np.asarray(FH).reshape((xdim,ydim))
 
     #get the average signal value
@@ -237,9 +247,17 @@ def main():
 #    plt.savefig('Imgs/map_'+data_filename.split("/")[-1]+".png", bbox_inches='tight')
 #    plt.show()
     
+    #tableData = BigTable[:,:3000+Offset]
+    plt.imshow((abs(tableData)), aspect='auto')
+    #plt.axhline(IndexLine, color='r', linestyle='--')
+    #plt.title("Mapping the data from "+RawData.split("/")[-1]+" .")  
+    #plt.savefig('Imgs/map_'+RawData.split("/")[-1]+".png", bbox_inches='tight')
+    plt.show()
+    return
     #these are the index lines.
     #the values have to be found manually
     ListOfPoints= [2920, 8682]
+    #ListOfPoints= [104, 418, 741]
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,5))
     
@@ -265,7 +283,8 @@ def main():
     for i in range(150):
         tmp = decimate(tableData[ListOfPoints[0]-70+i], 5, ftype='fir')
         #print tmp.shape
-        tmp += decimate(tableData[ListOfPoints[1]-70+i], 5, ftype='fir')
+        #tmp += decimate(tableData[ListOfPoints[1]-70+i], 5, ftype='fir')
+        #tmp += decimate(tableData[ListOfPoints[2]-70+i], 5, ftype='fir')
         #print tmp.shape
         #print tmp.shape
         #raw_input()
