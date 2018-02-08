@@ -2,7 +2,6 @@
 	Developed by Daniel Pelikan 2013,2014
 	http://digibird1.wordpress.com/
 	Reviewed by @kelu124
-	Used in `20170713a`
 */
 
 #include <linux/kernel.h>
@@ -55,7 +54,8 @@ static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 //---------------------------------------------------------------------------------------------------------
 
 //How many samples to capture
-#define SAMPLE_SIZE 	5000000
+#define SAMPLE_SIZE 	5000
+#define REPEAT_SIZE 	200
 
 //Define GPIO Pins
 
@@ -84,7 +84,7 @@ static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 // Pulser
 #define Puls_ON	 23
 #define Puls_OFF 24
-#define MaxBit 31
+
 
 #define PPWWMM 6
 #define VU 21
@@ -137,7 +137,7 @@ static struct bcm2835_peripheral gpio = {GPIO_BASE};
 
 
 static struct DataStruct{
-	uint32_t Buffer[SAMPLE_SIZE];
+	uint32_t Buffer[REPEAT_SIZE*SAMPLE_SIZE];
 	uint32_t time;
 };
 
@@ -159,13 +159,19 @@ static int map_peripheral(struct bcm2835_peripheral *p)
 static void unmap_peripheral(struct bcm2835_peripheral *p) {
  	iounmap(p->addr);//unmap the address
 }
+
+
 //---------------------------------------------------------------------------------------------------------
 /*
  In our case we are only taking 10k samples so not too much time. Before the sample taking we take a time stamp. Then we read out 10k times the GPIO register and save it in our data structure. The GPIO register is a 32bit value so it is made out of 32 ‘1’s and ‘0’s each defining if the GPIO port is high (3.3V) or low (GND). After the read out we take another time stamp and turn on all interrupts again. The two time stamps we took are important since we can calculate how long it took to read in the 10k samples. The time difference divided by 10k gives us the time between each sample point. In case the sample frequency is too high and should be reduced one can add some delay and waste some time during each readout step. Here the aim is to achieve the maximal performance.
 */
-static void readScope(){
 
+static void readScope(){
+	printk(KERN_INFO "starting acquisition\n");
 	int counter=0;
+	int counterline = 0;
+	int limit = 0;
+
 	int Pon=0;
 	int Poff=0;
 	//int Fail=0;
@@ -177,36 +183,49 @@ static void readScope(){
 	struct timespec ts_start,ts_stop;
 	//Start time
 
-        GPIO_SET = 1 << MaxBit;
-
-set_current_state(TASK_UNINTERRUPTIBLE);
-
-        GPIO_SET = 1 << Puls_ON;
-	while(Pon<10){
-MY_NOP(__N);
-Pon++;
-}
-        GPIO_CLR = 1 << Puls_ON;
-
-        GPIO_SET = 1 << Puls_OFF;
-	while(Poff<1500){
-MY_NOP(__N);
-Poff++;
-}
-        GPIO_CLR = 1 << Puls_OFF;
-
-
-
-
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	getnstimeofday(&ts_start);
-	//take samples
-	while(counter<SAMPLE_SIZE){
-		dataStruct.Buffer[counter++]= *(gpio.addr + 13); 
-		ndelay(10)
+
+	while(counterline<REPEAT_SIZE){ 
+		printk(KERN_INFO "Shooting line %d\n", counterline);
+
+		GPIO_SET = 1 << Puls_ON;
+		while(Pon<10){
+			MY_NOP(__N);
+			Pon++;
+		}
+		GPIO_CLR = 1 << Puls_ON;
+
+		GPIO_SET = 1 << Puls_OFF;
+		while(Poff<1500){
+			MY_NOP(__N);
+			Poff++;
+		}
+		GPIO_CLR = 1 << Puls_OFF;
+
+		//take samples
+		/*
+		if(counterline < (REPEAT_SIZE-1) ){
+			limit = counterline*(SAMPLE_SIZE+1);
+		}else{
+			limit = (REPEAT_SIZE)*SAMPLE_SIZE;
+		}
+		*/
+
+		limit = (counterline+1)*SAMPLE_SIZE;
+
+		while(counter<(limit) ){
+			dataStruct.Buffer[counter++]= *(gpio.addr + 13); 
+		}
+
+		counterline++;
 	}
+
+
 
 	//Stop time
 	getnstimeofday(&ts_stop);
+
 	set_current_state(TASK_INTERRUPTIBLE);
 	//enable IRQ
 	local_fiq_enable();
@@ -220,6 +239,7 @@ Poff++;
 	ScopeBufferStart=&dataStruct;
 
 	ScopeBufferStop=ScopeBufferStart+sizeof(struct DataStruct);
+	printk(KERN_INFO "returning from acquisition\n");
 }
 
 //---------------------------------------------------------------------------------------------------------
@@ -295,6 +315,7 @@ int init_module(void)
 	*(myclock.addr+29)= 0x5A000000 | (0x32 << 12) | 0;//Set divider //divide by 50
 	*(myclock.addr+28)=0x5A000010 | speed_id;//Turn clock on
 
+	printk(KERN_INFO "registered module\n");
 	return SUCCESS;
 }
 //---------------------------------------------------------------------------------------------------------
@@ -303,9 +324,11 @@ int init_module(void)
  */
 void cleanup_module(void)
 {
+	printk(KERN_INFO "cleanup_module\n");
 	unregister_chrdev(Major, DEVICE_NAME);
 	unmap_peripheral(&gpio);
 	unmap_peripheral(&myclock);
+	printk(KERN_INFO "cleanup_module done\n");
 }
 //---------------------------------------------------------------------------------------------------------
 /* 
@@ -317,6 +340,7 @@ Furthermore a function is needed which is called when the device file belonging 
 */
 static int device_open(struct inode *inode, struct file *file)
 {
+	printk(KERN_INFO "Opened Device\n");
 	static int counter = 0;
 
 	if (Device_Open)
@@ -329,7 +353,7 @@ static int device_open(struct inode *inode, struct file *file)
 	readScope();//Read n Samples into memory
 
 	try_module_get(THIS_MODULE);
-
+	printk(KERN_INFO "Leaving device open\n");
 	return SUCCESS;
 }
 //---------------------------------------------------------------------------------------------------------
@@ -338,8 +362,10 @@ static int device_open(struct inode *inode, struct file *file)
  */
 static int device_release(struct inode *inode, struct file *file)
 {
+	printk(KERN_INFO "device_release\n");
 	Device_Open--;		/* We're now ready for our next caller */
 	module_put(THIS_MODULE);
+	printk(KERN_INFO "device_release done\n");
 	return 0;
 }
 //---------------------------------------------------------------------------------------------------------
@@ -352,7 +378,7 @@ static ssize_t device_read(struct file *filp,
 			   size_t length,
 			   loff_t * offset)
 {
-	
+	printk(KERN_INFO "Reading from Device\n");
 	// Number of bytes actually written to the buffer 
 	int bytes_read = 0;
 
@@ -368,7 +394,8 @@ static ssize_t device_read(struct file *filp,
 		length--;
 		bytes_read++;
 	}
-
+	
+	printk(KERN_INFO "Reading from Device finished\n");
 	return bytes_read;
 }
 //---------------------------------------------------------------------------------------------------------
