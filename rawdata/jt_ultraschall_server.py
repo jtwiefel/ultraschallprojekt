@@ -21,21 +21,27 @@ class UltraschallServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()
-        
-        os.system("sudo insmod ./scope.ko")
-        os.system("sudo mknod /dev/chardev c 243 0")
 
         device_name = "/dev/chardev"
-        
-        #for dummy acquisition
-        #device_name =  "hannes28.dat"
-        #print device_name
 
-        raw_data = np.fromfile(device_name, dtype = '<i4')
-        self.wfile.write(dumps(raw_data))
+        #for dummy acquisition
+
+        #device_name =  "hannes28.dat"
+        #import random
+        #device_name = "hannes"+str(random.randint(28,30))+".dat"
         
-        os.system("sudo rm /dev/chardev")
-        os.system("sudo rmmod scope.ko")
+        try:
+            if device_name == "/dev/chardev":
+                os.system("sudo insmod ./scope.ko")
+                os.system("sudo mknod /dev/chardev c 243 0")
+
+            raw_data = np.fromfile(device_name, dtype = '<i4')
+            self.wfile.write(dumps(raw_data))
+            
+        finally:
+            if device_name == "/dev/chardev":
+                os.system("sudo rm /dev/chardev")
+                os.system("sudo rmmod scope.ko")
 
         
 def run(server_class=HTTPServer, handler_class=UltraschallServer, port=8000):

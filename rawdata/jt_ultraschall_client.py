@@ -9,46 +9,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 import requests
 import copy
-from cPickle import dumps, loads
+from cPickle import loads
 class UltraschallCient:
     def __init__(self):
+        self.fig = plt.figure(figsize=(15,5))
+        plt.ion()
+        plt.show()
         pass
-    def acquire(self):
-        filename =  "hannes28"
-        with open(filename+".dat", 'rb') as device:
-            raw_data = device.read()
-        print type(raw_data)
-        print len(raw_data)
-        print raw_data[0:10]
-        Bytes_old = np.fromfile(filename+".dat", dtype = '<i4')
-        print type(Bytes_old)
-        print len(Bytes_old)
-        print Bytes_old[0:10]
-        url = "http://localhost:8000"
-        r = requests.get(url,stream=True)
-        #print r.content
-        data = loads(r.content)
-        print type(data)
-        print len(data)
-        print data[0:10]
-        Bytes = np.fromstring(data, dtype = '<i4')
-        print type(Bytes)
-        print len(Bytes)
-        print Bytes[0:10]
         
         
     def fast_image(self):
         filename = "live_image"
         url = "http://raspberrypi.local:8000"
+        
+        #if testing with a local dummy:
+        #url = "http://localhost:8000"
+        
         r = requests.get(url,stream=True)
         #print r.content
         data = loads(r.content)
-        print type(data)
-        print len(data)
-        print data[0:10]
+        #print type(data)
+        #print len(data)
+        #print data[0:10]
         Bytes = np.fromstring(data, dtype = '<i4')
-        
-        #real code starts here
+
         #Bytes = np.fromfile(filename+".dat", dtype = '<i4')
         bytes = Bytes[:-1]
     
@@ -56,16 +40,14 @@ class UltraschallCient:
         #we want to have the bits from 7 to 8 and 23 to 25, so lets do som bit shifting magic...
         sbytes = copy.deepcopy(bytes)
         sbytes = np.right_shift(bytes,7) #so remove right bits below 7
-        sbytes = np.bitwise_and(sbytes,31)
+        sbytes = np.bitwise_and(sbytes,31) #31 == 11111, so we keep the 5 bits on the right
     
         bbytes = copy.deepcopy(bytes)
-        bbytes = np.right_shift(bbytes,18) #so remove right bits below 7
-        bbytes = np.bitwise_and(bbytes,511)
+        bbytes = np.right_shift(bbytes,18) #so remove right bits below 18 and not 23, because we need 5 bits for sbytes
+        bbytes = np.bitwise_and(bbytes,255) # 255 == 11111111 , 255 should also be ok...
     
-        mbytes = sbytes+bbytes
-    
-    
-        #et voila
+        mbytes = sbytes+bbytes #concat the small 5 bits with the big 3 bits, et voila, we have an integer
+
         M = mbytes
     
         #get sample frequency, duration and the time
@@ -77,14 +59,14 @@ class UltraschallCient:
         t = range(n)
         for k in range(n):
             t[k] = 1.0*t[k]/Fech
-        print t[:10]
+        #print t[:10]
     
         rawSig = M
         #rawSig = M - np.average(M)
-        print len(rawSig)
+        #print len(rawSig)
         
         T = t
-        print T[:10]
+        #print T[:10]
         
         repeat_size = 400 #repeat size
         sample_size = 5000 #sample size
@@ -94,49 +76,47 @@ class UltraschallCient:
         #reshape envelope of the signal
         tableData = np.asarray(FH).reshape((repeat_size,sample_size))
         
-        IndexEmpty = 20 #where does this number come from?
+        #IndexEmpty = 20 #where does this number come from?
         IndexLine = 104 #where does this number come from?
         
         ExLine = tableData[IndexLine]
-        ExLineRaw = tableData[IndexLine]
-        plt.figure(figsize=(15,5))
+        #ExLineRaw = tableData[IndexLine]
+        
+        #clear the figure
+        self.fig.clear()
+        
+        #plot the index line        
         plt.subplot(211)
-        plt.plot(T[0:3000],rawSig[5000*IndexLine:5000*IndexLine+3000],"y", label='Raw signal')
-        #plt.plot(T[0:3000],F[5000*IndexLine:5000*IndexLine+3000],"r", label='Filtered signal')
-        plt.plot(T[0:3000],ExLine[0:3000],"b", label='Enveloppe of the signal')
-        print len(T[0:3000])
-        print len(ExLine[0:3000])
-        #the dimensions are not matching. guess theres something wrong with the dimensions of tableData
+        plot_depth=3000
+
+        plt.plot(T[0:plot_depth],ExLine[0:plot_depth],"b", label='Enveloppe of the signal')
+        #plt.xticks(range(-400,plot_depth), rotation='vertical')
         plt.title("Details of a line from "+filename.split("/")[-1])
         plt.xlabel("Time in uS")
         plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-        #plt.savefig('Imgs/ProcessingLine_'+filename.split("/")[-1]+".png", bbox_inches='tight')
-        #plt.show()
         
-        #add an offset to the image, will do that later
+        
+        #add an offset to the image
         #get average value
         Val = np.average(tableData)
-        #tableData = np.asarray(FH).reshape((1000,2*2500))
         Offset = 400
-        MinTable = 10*np.min(tableData)
         Zeroes = np.zeros((repeat_size,Offset))+Val
         BigTable = []
         BigTable = np.append(Zeroes, tableData, axis=1)
         
+        #plot the image        
         plt.subplot(212)
-        #plot the reshaped data
-        #there are some dots, so guess the file contains data
         plt.imshow((abs(BigTable)), aspect='auto')
         plt.title("Image of "+filename.split("/")[-1])
         plt.axhline(IndexLine, color='r', linestyle='--')
-        #plt.title("Mapping the data from "+RawData.split("/")[-1]+" .")  
-        #plt.savefig('Imgs/map_'+filename.split("/")[-1]+".png", bbox_inches='tight')
-        #
-        plt.show()
+
+        #show it
+        plt.draw()
+        plt.pause(0.00001)
+
         
     
 if __name__ == "__main__":
-    print "server started"
     uc = UltraschallCient()
     #uc.fast_image("hannes28")
     
