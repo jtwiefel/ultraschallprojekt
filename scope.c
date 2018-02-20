@@ -188,7 +188,8 @@ static void readScope(){
 
 	while(counterline<REPEAT_SIZE){ 
 		printk(KERN_INFO "Shooting line %d\n", counterline);
-
+		Pon=0;
+		Poff=0;
 		GPIO_SET = 1 << Puls_ON;
 		while(Pon<10){
 			MY_NOP(__N);
