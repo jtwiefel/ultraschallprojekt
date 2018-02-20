@@ -20,7 +20,8 @@ class UltraschallCient:
         
     def fast_image(self):
         filename = "live_image"
-        url = "http://raspberrypi.local:8000"
+        #url = "http://raspberrypi.local:8000"
+        url = "http://79.209.217.51:8000"
         
         #if testing with a local dummy:
         #url = "http://localhost:8000"
@@ -122,3 +123,4 @@ if __name__ == "__main__":
     
     while True:
         uc.fast_image()
+        raw_input()
