@@ -60,30 +60,19 @@ static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 //Define GPIO Pins
 
 //ADC 1
-#define BIT0_PIN 16
-#define BIT1_PIN 17
-#define BIT2_PIN 18
-#define BIT3_PIN 19
-#define BIT4_PIN 20
-#define BIT5_PIN 22
-#define BIT6_PIN 25
-#define BIT7_PIN 26
-#define BIT8_PIN 27
-
-//ADC 2
-#define BIT0_PIN2 7
-#define BIT1_PIN2 8
-#define BIT2_PIN2 9
-#define BIT3_PIN2 10
-#define BIT4_PIN2 11
-#define BIT5_PIN2 12
-#define BIT6_PIN2 13
-#define BIT7_PIN2 14
-#define BIT8_PIN2 15
+#define BIT0_PIN 7
+#define BIT1_PIN 8
+#define BIT2_PIN 9
+#define BIT3_PIN 10
+#define BIT4_PIN 11
+#define BIT5_PIN 23
+#define BIT6_PIN 24
+#define BIT7_PIN 25
 
 // Pulser
-#define Puls_ON	 23
-#define Puls_OFF 24
+#define Puls_ON	 22
+#define Puls_OFF 13
+#define Servo 17
 
 
 #define PPWWMM 6
@@ -284,24 +273,13 @@ int init_module(void)
 	INP_GPIO(BIT5_PIN);
 	INP_GPIO(BIT6_PIN);
 	INP_GPIO(BIT7_PIN);
-	INP_GPIO(BIT8_PIN);
-
-
-	INP_GPIO(BIT0_PIN2);
-	INP_GPIO(BIT1_PIN2);
-	INP_GPIO(BIT2_PIN2);
-	INP_GPIO(BIT3_PIN2);
-	INP_GPIO(BIT4_PIN2);
-	INP_GPIO(BIT5_PIN2);
-	INP_GPIO(BIT6_PIN2);
-	INP_GPIO(BIT7_PIN2);
-	INP_GPIO(BIT8_PIN2);
 
         INP_GPIO(VU);
         INP_GPIO(PPWWMM);
 
 	OUT_GPIO(Puls_ON);
 	OUT_GPIO(Puls_OFF);
+	OUT_GPIO(Servo);
 
 	//Set a clock signal on Pin 4
 	struct bcm2835_peripheral *p=&myclock;
